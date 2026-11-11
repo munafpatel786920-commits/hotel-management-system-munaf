@@ -28,6 +28,14 @@ service cloud.firestore {
       allow delete: if isSignedIn() && (getUserData().role == "Hotel Admin" || getUserData().role == "Super Admin" || getUserData().role == "System Owner");
     }
 
+    // Activation Keys
+    match /activationKeys/{keyId} {
+      allow read: if true;
+      allow create, delete: if isSignedIn() && (getUserData().role == "Super Admin" || getUserData().role == "System Owner");
+      allow update: if (resource.data.status == "active" && request.resource.data.status == "used")
+                   || (isSignedIn() && (getUserData().role == "Super Admin" || getUserData().role == "System Owner"));
+    }
+
     // Hotels
     match /hotels/{hotelId} {
       allow read: if isSignedIn() && isUserInHotel(hotelId);

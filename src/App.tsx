@@ -60,6 +60,7 @@ import Employees from './components/Employees';
 import Accounting from './components/Accounting';
 import Reports from './components/Reports';
 import SuperAdminPanel from './components/SuperAdminPanel';
+import CustomerActivation from './components/CustomerActivation';
 // @ts-expect-error - dynamic image import from assets
 import globalSoftwareLogo from './assets/images/global_software_logo_1784199698161.jpg';
 
@@ -78,7 +79,8 @@ import {
   TrendingUp,
   Bed,
   Coins,
-  Users
+  Users,
+  KeyRound
 } from 'lucide-react';
 
 export default function App() {
@@ -136,8 +138,8 @@ export default function App() {
     }
   }, [userProfile, currentTab]);
 
-  // Login/Signup Form States
-  const [authTab, setAuthTab] = useState<'login' | 'signup'>('login');
+  // Login / Activation View States
+  const [authTab, setAuthTab] = useState<'login' | 'activation'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
@@ -448,11 +450,22 @@ export default function App() {
 
             setUserProfile(pData);
 
-            // Check if user is approved
+            // Check if user is approved & license is active
             const isSuper = pData.role === 'System Owner' || pData.role === 'Super Admin';
-            const isApproved = pData.isApproved === true;
-            if (!isSuper && !isApproved) {
+            const isApproved = pData.isApproved !== false;
+            const isBlocked = pData.licenseStatus === 'blocked';
+            let isExpired = false;
+            if (pData.licenseExpiresAt) {
+              isExpired = new Date(pData.licenseExpiresAt).getTime() < Date.now();
+            }
+
+            if (!isSuper && (!isApproved || isBlocked || isExpired)) {
               setIsPendingApproval(true);
+              if (isBlocked) {
+                setAuthError('Your customer account has been blocked by Super Admin.');
+              } else if (isExpired) {
+                setAuthError(`Your software license expired on ${pData.licenseExpiresAt?.split('T')[0]}. Please contact Super Admin to renew.`);
+              }
             } else {
               setIsPendingApproval(false);
             }
@@ -1774,6 +1787,33 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Mode Switcher Tabs */}
+              <div className="flex p-1 bg-slate-100 rounded-xl border border-slate-200/80">
+                <button
+                  type="button"
+                  onClick={() => setAuthTab('login')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition cursor-pointer ${
+                    authTab === 'login'
+                      ? 'bg-white text-indigo-600 shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Sign In with User ID
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAuthTab('activation')}
+                  className={`flex-1 py-2 text-xs font-bold rounded-lg transition cursor-pointer flex items-center justify-center space-x-1 ${
+                    authTab === 'activation'
+                      ? 'bg-gradient-to-r from-indigo-600 to-blue-600 text-white shadow-xs'
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Activate License Key</span>
+                </button>
+              </div>
+
               {/* Error Warning block */}
               {authError && (
                 <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-xs text-red-800 space-y-1.5">
@@ -1785,81 +1825,95 @@ export default function App() {
                 </div>
               )}
 
-              {/* Quota Exceeded Warning block */}
-              {quotaExceeded && (
-                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl text-xs text-amber-800 dark:text-amber-300 space-y-2.5">
-                  <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-400 font-bold">
-                    <ShieldCheck className="w-4 h-4 shrink-0 animate-pulse" />
-                    <span className="uppercase tracking-wider text-[9px]">Cloud Database Quota Limit Reached</span>
-                  </div>
-                  <p className="leading-relaxed text-[11px] font-medium">
-                    The underlying Firestore database has reached its write/bandwidth limit for today. You can bypass this instantly by switching to **Offline Local Storage Mode** where all features remain fully functional.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsLocalMode(true);
-                      localStorage.setItem('pms_local_mode', 'true');
-                      setQuotaExceeded(false);
-                      window.location.reload();
-                    }}
-                    className="w-full py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[10px] transition cursor-pointer"
-                  >
-                    Switch to Offline Local Mode
-                  </button>
-                </div>
-              )}
-
-              {/* Form */}
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">Email Address</label>
-                  <div className="relative">
-                    <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="email"
-                      required
-                      placeholder="e.g. admin@grandhotel.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">Password</label>
-                  <div className="relative">
-                    <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="password"
-                      required
-                      placeholder="Enter security password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs font-black tracking-wide uppercase transition shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/25 cursor-pointer disabled:opacity-60 flex items-center justify-center space-x-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                      <span>Authenticating stay...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span>Authenticate ERP</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </>
+              {authTab === 'activation' ? (
+                <CustomerActivation
+                  onActivationSuccess={(actEmail, actPass) => {
+                    setEmail(actEmail);
+                    setPassword(actPass);
+                    setAuthTab('login');
+                    signInWithEmailAndPassword(auth, actEmail, actPass).catch((e) => console.error(e));
+                  }}
+                  onCancel={() => setAuthTab('login')}
+                />
+              ) : (
+                <>
+                  {/* Quota Exceeded Warning block */}
+                  {quotaExceeded && (
+                    <div className="p-4 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900 rounded-2xl text-xs text-amber-800 dark:text-amber-300 space-y-2.5">
+                      <div className="flex items-center space-x-1.5 text-amber-700 dark:text-amber-400 font-bold">
+                        <ShieldCheck className="w-4 h-4 shrink-0 animate-pulse" />
+                        <span className="uppercase tracking-wider text-[9px]">Cloud Database Quota Limit Reached</span>
+                      </div>
+                      <p className="leading-relaxed text-[11px] font-medium">
+                        The underlying Firestore database has reached its write/bandwidth limit for today. You can bypass this instantly by switching to **Offline Local Storage Mode** where all features remain fully functional.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsLocalMode(true);
+                          localStorage.setItem('pms_local_mode', 'true');
+                          setQuotaExceeded(false);
+                          window.location.reload();
+                        }}
+                        className="w-full py-1.5 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl text-[10px] transition cursor-pointer"
+                      >
+                        Switch to Offline Local Mode
+                      </button>
+                    </div>
                   )}
-                </button>
-              </form>
+
+                  {/* Form */}
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">User ID (Email Address)</label>
+                      <div className="relative">
+                        <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="email"
+                          required
+                          placeholder="e.g. admin@grandhotel.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">Password</label>
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="password"
+                          required
+                          placeholder="Enter security password"
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="w-full pl-9 pr-4 py-2.5 bg-slate-50 hover:bg-slate-100/60 border border-slate-200 rounded-xl text-xs text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-indigo-600 focus:border-indigo-600 transition"
+                        />
+                      </div>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.98] text-white rounded-xl text-xs font-black tracking-wide uppercase transition shadow-lg shadow-indigo-600/15 hover:shadow-indigo-600/25 cursor-pointer disabled:opacity-60 flex items-center justify-center space-x-2"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Authenticating stay...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Authenticate ERP</span>
+                          <ArrowRight className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </>
+              )}
 
               {/* Copyright & Support Info */}
               <p className="text-center text-[10px] text-slate-400 font-semibold uppercase tracking-wider">

@@ -1,3 +1,6 @@
+export type LicenseDuration = '1_month' | '3_months' | '6_months' | '1_year' | 'lifetime';
+export type LicenseStatus = 'active' | 'blocked' | 'expired';
+
 export interface Hotel {
   id: string;
   name: string;
@@ -14,6 +17,12 @@ export interface Hotel {
   logo?: string;
   taxRate: number; // default percentage, e.g. 12 for 12%
   taxLabel?: string;
+  tenantId?: string;
+  licenseKey?: string;
+  licenseDuration?: LicenseDuration;
+  activationDate?: string;
+  licenseExpiresAt?: string | null;
+  licenseStatus?: LicenseStatus;
 }
 
 export type UserRole =
@@ -31,7 +40,26 @@ export interface UserProfile {
   email: string;
   role: UserRole;
   hotelId: string;
+  tenantId?: string;
   isApproved?: boolean;
+  hotelName?: string;
+  licenseStatus?: LicenseStatus;
+  licenseExpiresAt?: string | null;
+}
+
+export interface ActivationKey {
+  id: string;
+  plainKey?: string;           // Displayed once upon creation
+  keyPrefix: string;          // e.g. "HMS-3M-A8B9..." for UI identification
+  keyHash: string;            // SHA-256 hash stored in Firestore
+  duration: LicenseDuration;
+  durationDays: number;       // e.g. 30, 90, 180, 365, or 36500 for lifetime
+  status: 'active' | 'used' | 'revoked';
+  createdAt: string;
+  activatedAt?: string;
+  expiresAt?: string | null;
+  usedByTenantId?: string;
+  usedByEmail?: string;
   hotelName?: string;
 }
 
